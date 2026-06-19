@@ -1,0 +1,63 @@
+export const Colors = {
+  light: {
+    primary: '#1B6B4B',        // Emerald Green
+    primaryLight: '#2D8F6F',
+    primaryDark: '#14523A', 
+    accent: '#C9A84C',         // Gold
+    accentLight: '#E8D48B',
+    background: '#FAFAFA',
+    surface: '#FFFFFF',
+    surfaceGlass: 'rgba(255, 255, 255, 0.7)',
+    card: '#FFFFFF',
+    text: '#1A1A2E',
+    textSecondary: '#6B7280',
+    textLight: '#9CA3AF',
+    border: '#E5E7EB',
+    divider: '#F0F0F0',
+    error: '#DC2626',
+    success: '#059669',
+    warning: '#D97706',
+    info: '#2563EB',
+    darkNavy: '#0F1B2D',
+    darkNavyLight: '#1A2940',
+    emerald: '#1B6B4B',
+    gold: '#C9A84C',
+    white: '#FFFFFF',
+    shadow: 'rgba(0, 0, 0, 0.08)',
+    overlay: 'rgba(0, 0, 0, 0.5)',
+    gradientStart: '#1B6B4B',
+    gradientEnd: '#C9A84C',
+  },
+  dark: {
+    primary: '#2D8F6F',        // Lighter Emerald for dark mode
+    primaryLight: '#3DAF8B',
+    primaryDark: '#1B6B4B',
+    accent: '#E8D48B',         // Lighter Gold
+    accentLight: '#F0E4A8',
+    background: '#0F1B2D',
+    surface: '#1A2940',
+    surfaceGlass: 'rgba(26, 41, 64, 0.8)',
+    card: '#1E3050',
+    text: '#F0F0F0',
+    textSecondary: '#B0B5C0',
+    textLight: '#7A7F8C',
+    border: '#2A3F60',
+    divider: '#253956',
+    error: '#EF4444',
+    success: '#10B981',
+    warning: '#F59E0B',
+    info: '#3B82F6',
+    darkNavy: '#0A1525',
+    darkNavyLight: '#152238',
+    emerald: '#2D8F6F',
+    gold: '#E8D48B',
+    white: '#FFFFFF',
+    shadow: 'rgba(0, 0, 0, 0.3)',
+    overlay: 'rgba(0, 0, 0, 0.7)',
+    gradientStart: '#1B6B4B',
+    gradientEnd: '#C9A84C',
+  },
+};
+
+export type ThemeColors = typeof Colors.light;
+export type ThemeMode = 'light' | 'dark';
