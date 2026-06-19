@@ -2,15 +2,6 @@ name: iOS IPA Build
 
 on:
   workflow_dispatch:
-    inputs:
-      profile:
-        description: 'EAS build profile'
-        required: true
-        default: 'ios-sideload'
-        type: choice
-        options:
-          - ios-sideload
-          - development
 
 jobs:
   build-ios:
@@ -28,56 +19,99 @@ jobs:
       - name: 📦 Install dependencies
         run: npm ci
 
-      - name: 🔑 Setup Expo and EAS
+      - name: 🔑 Login to Expo
         uses: expo/expo-github-action@v8
         with:
           expo-version: latest
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: 🍎 Select Xcode version
-        run: |
-          # macos-14 da eng so'nggi Xcode ni tanlash
-          ls /Applications/Xcode*.app/Contents/Developer 2>/dev/null || echo "Xcode found"
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer 2>/dev/null || true
+      - name: 🍎 Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
       - name: 📱 Generate native iOS project
         run: npx expo prebuild --platform ios --non-interactive --clean
 
-      - name: 🏗️ Build iOS IPA
+      - name: 🔍 Find Xcode workspace and scheme
+        id: workspace
         run: |
-          eas build \
-            --platform ios \
-            --profile ${{ github.event.inputs.profile || 'ios-sideload' }} \
-            --local \
-            --non-interactive \
-            --message "GitHub Actions build"
-        env:
-          EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
-          EXPO_APPLE_PASSWORD: ${{ secrets.EXPO_APPLE_PASSWORD }}
+          WS=$(find ios -name "*.xcworkspace" -type d -maxdepth 1 2>/dev/null | head -1)
+          SCHEME=$(find ios -name "*.xcodeproj" -type d -maxdepth 1 2>/dev/null | head -1 | xargs basename | sed 's/\.xcodeproj//')
+          echo "Workspace: $WS"
+          echo "Scheme: $SCHEME"
+          echo "workspace=$WS" >> $GITHUB_OUTPUT
+          echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
 
-      - name: 📍 Find and copy IPA file
+      - name: 🔧 Configure Xcode for unsigned build
         run: |
-          mkdir -p build-output
-          echo "Looking for IPA files..."
-          find . -name "*.ipa" -type f 2>/dev/null
-          IPA_PATH=$(find . -maxdepth 4 -name "*.ipa" -type f 2>/dev/null | head -1)
-          if [ -z "$IPA_PATH" ]; then
-            echo "Trying alternative search..."
-            IPA_PATH=$(ls -t build-*/*.ipa 2>/dev/null | head -1)
-          fi
-          if [ -z "$IPA_PATH" ]; then
-            ls -la
-            find . -maxdepth 5 -type f \( -name "*.ipa" -o -name "*.xcarchive" \) 2>/dev/null
-          fi
-          if [ -n "$IPA_PATH" ]; then
-            cp "$IPA_PATH" build-output/NoorIslam.ipa
-            echo "✅ IPA copied to build-output/NoorIslam.ipa"
-            ls -lh build-output/NoorIslam.ipa
-          else
-            echo "⚠️ IPA file not found"
+          PROJECT=$(find ios -name "project.pbxproj" -type f 2>/dev/null | head -1)
+          echo "Configuring: $PROJECT"
+
+          # CODE_SIGN_STYLE = Manual
+          sed -i '' 's/CODE_SIGN_STYLE = [^;]*;/CODE_SIGN_STYLE = Manual;/g' "$PROJECT"
+          # CODE_SIGN_IDENTITY = ""
+          sed -i '' 's/CODE_SIGN_IDENTITY = "[^"]*";/CODE_SIGN_IDENTITY = "";/g' "$PROJECT"
+          sed -i '' 's/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g' "$PROJECT"
+          # DEVELOPMENT_TEAM = ""
+          sed -i '' 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' "$PROJECT"
+          # PROVISIONING_PROFILE = ""
+          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$PROJECT"
+          sed -i '' 's/PROVISIONING_PROFILE = [^;]*;/PROVISIONING_PROFILE = "";/g' "$PROJECT"
+
+          echo "✅ Xcode configured for unsigned build"
+
+      - name: 🏗️ Build .app and create IPA
+        run: |
+          set -o pipefail
+
+          WS="${{ steps.workspace.outputs.workspace }}"
+          SCHEME="${{ steps.workspace.outputs.scheme }}"
+          BUILD_DIR="build/derived"
+
+          echo "Building workspace: $WS, scheme: $SCHEME"
+
+          # To'g'ridan-to'g'ri .app build (archive+export emas)
+          xcodebuild \
+            -workspace "$WS" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -sdk iphoneos \
+            -derivedDataPath "$BUILD_DIR" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            | tee build.log
+
+          echo "Build completed with exit code: $?"
+
+      - name: 📦 Package IPA
+        run: |
+          set -o pipefail
+          BUILD_DIR="build/derived"
+
+          # .app faylini topish
+          APP_PATH=$(find "$BUILD_DIR" -name "*.app" -type d -maxdepth 5 2>/dev/null | head -1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ .app not found in $BUILD_DIR"
+            echo "Available:"
+            find "$BUILD_DIR" -type d -maxdepth 5 2>/dev/null
             exit 1
           fi
+
+          echo "Found .app: $APP_PATH"
+          ls -lh "$APP_PATH"
+
+          # IPA yasash (Payload zip)
+          mkdir -p build-output Payload
+          cp -r "$APP_PATH" Payload/
+          cd Payload && zip -rq ../build-output/NoorIslam.ipa . && cd ..
+          rm -rf Payload
+
+          echo "✅ IPA created: build-output/NoorIslam.ipa"
+          ls -lh build-output/NoorIslam.ipa
 
       - name: 📤 Upload IPA artifact
         uses: actions/upload-artifact@v4
@@ -94,12 +128,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Profile | ${{ github.event.inputs.profile || 'ios-sideload' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Method | xcodebuild .app → zip IPA |" >> $GITHUB_STEP_SUMMARY
+          echo "| Signing | Unsigned (Sidestore re-signs) |" >> $GITHUB_STEP_SUMMARY
           echo "| Status | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "⬇️ **IPA fayli** — build tugagach, sahifaning pastki qismidagi \"Artifacts\" bo'limidan yuklab oling." >> $GITHUB_STEP_SUMMARY
+          echo "⬇️ **Artifacts** bo'limidan IPA ni yuklab oling" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📲 **Sidestore orqali o'rnatish:**" >> $GITHUB_STEP_SUMMARY
-          echo "1. IPA ni telefoningizga yuklab oling" >> $GITHUB_STEP_SUMMARY
-          echo "2. Sidestore da \"Open in Sidestore\" orqali o'rnating" >> $GITHUB_STEP_SUMMARY
-          echo "3. Settings > General > VPN & Device Management dan Trust qiling" >> $GITHUB_STEP_SUMMARY
+          echo "📲 **Sidestore:** Apps → + → IPA tanlang → install" >> $GITHUB_STEP_SUMMARY

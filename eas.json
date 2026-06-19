@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "credentialsSource": "local",
       "android": {
         "buildType": "apk"
       },
@@ -15,8 +16,8 @@
       }
     },
     "ios-sideload": {
-      "distribution": "internal",
       "developmentClient": true,
+      "credentialsSource": "local",
       "ios": {
         "buildConfiguration": "Debug",
         "simulator": false
