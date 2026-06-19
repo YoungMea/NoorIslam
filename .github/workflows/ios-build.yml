@@ -32,14 +32,34 @@ jobs:
       - name: 📱 Generate native iOS project
         run: npx expo prebuild --platform ios --non-interactive --clean
 
+      - name: 🔍 Debug ios/ contents
+        run: |
+          echo "=== ios/ directory contents ==="
+          find ios -maxdepth 3 -type d 2>/dev/null || echo "ios/ not found"
+          echo ""
+          echo "=== Workspace files ==="
+          find ios -name "*.xcworkspace" -type d 2>/dev/null || echo "No workspace found"
+          echo ""
+          echo "=== Project files ==="
+          find ios -name "*.xcodeproj" -type d 2>/dev/null || echo "No project found"
+          echo ""
+          echo "=== Podfile ==="
+          cat ios/Podfile 2>/dev/null || echo "No Podfile"
+
       - name: 🔍 Find Xcode workspace and scheme
         id: workspace
         run: |
-          WS=$(find ios -name "*.xcworkspace" -type d -maxdepth 1 2>/dev/null | head -1)
-          SCHEME=$(find ios -name "*.xcodeproj" -type d -maxdepth 1 2>/dev/null | head -1 | xargs basename | sed 's/\.xcodeproj//')
-          echo "Workspace: $WS"
+          # Workspace ni topish (bir nechta nom variantlari)
+          WS=$(find ios -name "*.xcworkspace" -type d 2>/dev/null | grep -v "Pods" | head -1)
+          # Project ni topish
+          PROJ=$(find ios -name "*.xcodeproj" -type d 2>/dev/null | grep -v "Pods" | head -1)
+          SCHEME=$(echo "$PROJ" | xargs basename 2>/dev/null | sed 's/\.xcodeproj//')
+          
+          echo "Found workspace: $WS"
+          echo "Found project: $PROJ"
           echo "Scheme: $SCHEME"
           echo "workspace=$WS" >> $GITHUB_OUTPUT
+          echo "project=$PROJ" >> $GITHUB_OUTPUT
           echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
 
       - name: 🔧 Configure Xcode for unsigned build
@@ -70,9 +90,17 @@ jobs:
 
           echo "Building workspace: $WS, scheme: $SCHEME"
 
-          # To'g'ridan-to'g'ri .app build (archive+export emas)
-          xcodebuild \
-            -workspace "$WS" \
+          # Workspace bormi yoki project ishlatamiz?
+          if [ -n "$WS" ] && [ "$WS" != " " ]; then
+            BUILD_TARGET="-workspace \"$WS\""
+            echo "Using workspace: $WS"
+          else
+            BUILD_TARGET="-project \"${{ steps.workspace.outputs.project }}\""
+            echo "Using project file directly"
+          fi
+
+          eval xcodebuild \
+            $BUILD_TARGET \
             -scheme "$SCHEME" \
             -configuration Debug \
             -sdk iphoneos \
