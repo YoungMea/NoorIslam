@@ -62,6 +62,10 @@ jobs:
           echo "project=$PROJ" >> $GITHUB_OUTPUT
           echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
 
+      - name: 🔧 Install CocoaPods dependencies
+        run: |
+          cd ios && pod install || npx pod-install
+
       - name: 🔧 Configure Xcode for unsigned build
         run: |
           PROJECT=$(find ios -name "project.pbxproj" -type f 2>/dev/null | head -1)
