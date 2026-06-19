@@ -5,7 +5,8 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-14
+    runs-on: macos-latest
+    # macos-latest = macOS 15 Sequoia, Xcode 16+
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -26,8 +27,19 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: 🍎 Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      - name: 🍎 Select Xcode 16
+        run: |
+          # Xcode 16 versiyasini topish
+          XCODE_16=$(ls /Applications/Xcode_16*.app 2>/dev/null | head -1)
+          if [ -n "$XCODE_16" ]; then
+            sudo xcode-select -s "$XCODE_16/Contents/Developer"
+            echo "Selected: $XCODE_16"
+          else
+            # Agar Xcode 16 topilmasa, default Xcode ni ishlatamiz
+            echo "Xcode 16 not found, checking available versions..."
+            ls /Applications/Xcode*.app 2>/dev/null || echo "No Xcode found"
+          fi
+          xcodebuild -version
 
       - name: 📱 Generate native iOS project
         run: npx expo prebuild --platform ios --non-interactive --clean
