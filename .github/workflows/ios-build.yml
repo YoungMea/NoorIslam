@@ -11,22 +11,10 @@ on:
         options:
           - ios-sideload
           - development
-      message:
-        description: 'Build note (optional)'
-        required: false
-        type: string
-      build_mode:
-        description: 'Build mode: local (macOS runner) or cloud (EAS cloud)'
-        required: true
-        default: 'local'
-        type: choice
-        options:
-          - local
-          - cloud
 
 jobs:
   build-ios:
-    runs-on: ${{ github.event.inputs.build_mode == 'local' && 'macos-14' || 'ubuntu-latest' }}
+    runs-on: macos-14
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -47,77 +35,58 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # ────────────── LOCAL BUILD (macOS runner) ──────────────
-      - name: 🏗️ Build iOS IPA (Local - macOS runner)
-        if: github.event.inputs.build_mode == 'local' || github.event.inputs.build_mode == ''
+      - name: 🍎 Select Xcode version
+        run: |
+          # macos-14 da eng so'nggi Xcode ni tanlash
+          ls /Applications/Xcode*.app/Contents/Developer 2>/dev/null || echo "Xcode found"
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer 2>/dev/null || true
+
+      - name: 📱 Generate native iOS project
+        run: npx expo prebuild --platform ios --non-interactive --clean
+
+      - name: 🏗️ Build iOS IPA
         run: |
           eas build \
             --platform ios \
             --profile ${{ github.event.inputs.profile || 'ios-sideload' }} \
             --local \
             --non-interactive \
-            --message "${{ github.event.inputs.message || 'GitHub Actions local build' }}"
+            --message "GitHub Actions build"
         env:
           EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
           EXPO_APPLE_PASSWORD: ${{ secrets.EXPO_APPLE_PASSWORD }}
-          # 2FA yoqilgan bo'lsa, app-specific password ishlating:
-          # EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
 
-      - name: 📍 Find and copy IPA file (local build)
-        if: github.event.inputs.build_mode == 'local' || github.event.inputs.build_mode == ''
+      - name: 📍 Find and copy IPA file
         run: |
           mkdir -p build-output
-          IPA_PATH=$(find . -maxdepth 2 -name "*.ipa" -type f 2>/dev/null | head -1)
+          echo "Looking for IPA files..."
+          find . -name "*.ipa" -type f 2>/dev/null
+          IPA_PATH=$(find . -maxdepth 4 -name "*.ipa" -type f 2>/dev/null | head -1)
           if [ -z "$IPA_PATH" ]; then
+            echo "Trying alternative search..."
             IPA_PATH=$(ls -t build-*/*.ipa 2>/dev/null | head -1)
+          fi
+          if [ -z "$IPA_PATH" ]; then
+            ls -la
+            find . -maxdepth 5 -type f \( -name "*.ipa" -o -name "*.xcarchive" \) 2>/dev/null
           fi
           if [ -n "$IPA_PATH" ]; then
             cp "$IPA_PATH" build-output/NoorIslam.ipa
             echo "✅ IPA copied to build-output/NoorIslam.ipa"
             ls -lh build-output/NoorIslam.ipa
           else
-            echo "⚠️ IPA file not found in expected locations"
-            echo "Current directory contents:"
-            ls -la
-            find . -maxdepth 3 -type f \( -name "*.ipa" -o -name "*.xcarchive" \) 2>/dev/null
+            echo "⚠️ IPA file not found"
+            exit 1
           fi
 
-      # ────────────── CLOUD BUILD (EAS cloud) ──────────────
-      - name: 🏗️ Build iOS IPA (EAS Cloud)
-        if: github.event.inputs.build_mode == 'cloud'
-        run: |
-          eas build \
-            --platform ios \
-            --profile ${{ github.event.inputs.profile || 'ios-sideload' }} \
-            --non-interactive \
-            --message "${{ github.event.inputs.message || 'GitHub Actions cloud build' }}"
-        env:
-          EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
-          EXPO_APPLE_PASSWORD: ${{ secrets.EXPO_APPLE_PASSWORD }}
-
-      - name: 📎 Download IPA from EAS Cloud
-        if: github.event.inputs.build_mode == 'cloud' && success()
-        run: |
-          mkdir -p build-output
-          eas build:download \
-            --platform ios \
-            --output build-output/NoorIslam.ipa \
-            --non-interactive
-        env:
-          EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
-          EXPO_APPLE_PASSWORD: ${{ secrets.EXPO_APPLE_PASSWORD }}
-
-      # ────────────── Upload IPA as artifact ──────────────
       - name: 📤 Upload IPA artifact
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: NoorIslam-iOS-IPA
           path: build-output/NoorIslam.ipa
           retention-days: 30
-          if-no-files-found: warn
+          if-no-files-found: error
 
-      # ────────────── Summary ──────────────
       - name: 📋 Build Summary
         if: always()
         run: |
@@ -125,7 +94,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Mode | ${{ github.event.inputs.build_mode || 'local' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Profile | ${{ github.event.inputs.profile || 'ios-sideload' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Status | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -134,4 +102,4 @@ jobs:
           echo "📲 **Sidestore orqali o'rnatish:**" >> $GITHUB_STEP_SUMMARY
           echo "1. IPA ni telefoningizga yuklab oling" >> $GITHUB_STEP_SUMMARY
           echo "2. Sidestore da \"Open in Sidestore\" orqali o'rnating" >> $GITHUB_STEP_SUMMARY
-          echo "3. Agar Settings > General > VPN & Device Management dan Trust qiling" >> $GITHUB_STEP_SUMMARY
+          echo "3. Settings > General > VPN & Device Management dan Trust qiling" >> $GITHUB_STEP_SUMMARY
