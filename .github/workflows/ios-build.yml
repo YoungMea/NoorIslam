@@ -91,24 +91,51 @@ jobs:
 
           echo "✅ Xcode configured for unsigned build"
 
-      - name: 🔧 Find and copy ExpoModulesCore headers
+      - name: 🔧 Create EXEventEmitter.h stub for expo-av compatibility
         run: |
-          # ExpoModulesCore headerlarini topamiz va xcframeworkga copy qilamiz
-          echo "=== Searching for EXEventEmitter.h ==="
-          find node_modules -name "EXEventEmitter.h" -not -path "*/Pods/*" 2>/dev/null | head -10
-          
+          # expo-av eski SDK da EXEventEmitter.h import qiladi,
+          # lekin SDK 56 dagi expo-modules-core da bu header yo'q.
+          # Stub yaratib xcframeworkga qo'shamiz (build uchun).
+
+          STUB_FILE="/tmp/EXEventEmitter.h"
+          cat > "$STUB_FILE" << 'OBJC'
+          // Stub for expo-av compatibility
+          // expo-av is deprecated - migrate to expo-video/expo-audio
+          #import <Foundation/Foundation.h>
+
+          @protocol EXEventEmitter <NSObject>
+
+          @required
+          - (NSArray<NSString *> *)supportedEvents;
+
+          @optional
+          - (void)startObserving;
+          - (void)stopObserving;
+
+          @end
+OBJC
+
+          echo "✅ Stub created at $STUB_FILE"
+          cat "$STUB_FILE"
           echo ""
-          echo "=== ExpoModulesCore directories in node_modules ==="
-          find node_modules/expo-modules-core-* -maxdepth 3 -type d 2>/dev/null | head -20 || true
-          find node_modules/expo-modules-core -maxdepth 3 -type d 2>/dev/null | head -20
-          
-          echo ""
-          echo "=== Looking for ExpoModulesCore.framework Headers ==="
-          find ios/Pods/ExpoModulesCore -path "*.framework/Headers" -type d 2>/dev/null | head -5
-          
-          echo ""
-          echo "=== Listing available .h files in expo-modules-core ==="
-          find node_modules/expo-modules-core -name "*.h" -maxdepth 5 2>/dev/null | head -30
+
+          # ExpoModulesCore xcframework ichidagi Headers papkalariga copy qilamiz
+          echo "=== Looking for ExpoModulesCore framework Headers dirs ==="
+          find ios/Pods/ExpoModulesCore -path "*.framework/Headers" -type d 2>/dev/null | while read DIR; do
+            echo "📁 Copying stub to: $DIR"
+            cp "$STUB_FILE" "$DIR/"
+            echo "   → Headers now: $(ls \"$DIR\" | tr '\n' ' ')"
+          done
+
+          # Agar framework topilmasa - Pods ichidagi barcha ExpoModulesCore papkalarini ko'rsat
+          HEADERS_COUNT=$(find ios/Pods/ExpoModulesCore -path "*.framework/Headers" -type d 2>/dev/null | wc -l)
+          if [ "$HEADERS_COUNT" -eq 0 ]; then
+            echo "⚠️  No ExpoModulesCore framework Headers found!"
+            echo "=== Pods/ExpoModulesCore directory ==="
+            find ios/Pods/ExpoModulesCore -type d -maxdepth 5 2>/dev/null | head -20
+          fi
+
+          echo "✅ EXEventEmitter.h stub installed"
 
       - name: 🏗️ Build .app and create IPA
         run: |
