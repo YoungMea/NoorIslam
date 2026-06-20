@@ -69,9 +69,9 @@ jobs:
           echo "project=$PROJ" >> $GITHUB_OUTPUT
           echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
 
-      - name: 🔧 Install CocoaPods dependencies
+      - name: 🔧 Install CocoaPods dependencies (no precompile)
         run: |
-          cd ios && pod install || npx pod-install
+          cd ios && EXPO_NO_PRECOMPILE=1 pod install || EXPO_NO_PRECOMPILE=1 npx pod-install
 
       - name: 🔧 Configure Xcode for unsigned build
         run: |
@@ -110,6 +110,9 @@ jobs:
             echo "Using project file directly"
           fi
 
+          # ExpoModulesCore prebuilt xcframeworkda ba'zi headerlar yo'q
+          EXPOMODULES_SRC="$PWD/node_modules/expo-modules-core/ios"
+
           eval xcodebuild \
             $BUILD_TARGET \
             -scheme "$SCHEME" \
@@ -121,6 +124,8 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
+            HEADER_SEARCH_PATHS="\$(inherited) \"$EXPOMODULES_SRC/**\"" \
+            EXPO_NO_PRECOMPILE=1 \
             | tee build.log
 
           echo "Build completed with exit code: $?"
