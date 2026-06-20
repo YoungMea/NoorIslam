@@ -8,6 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAudioPlayer } from 'expo-audio';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
 import { GlassmorphicCard } from '../components/GlassmorphicCard';
@@ -40,7 +41,28 @@ export function SurahDetailScreen({ route, navigation }: SurahDetailScreenProps)
   const [verses, setVerses] = useState<VerseDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [audioPlaying, setAudioPlaying] = useState(false);
+  const audioUrl = surahId ? api.getSurahAudioUrl(surahId) : undefined;
+  const player = useAudioPlayer(audioUrl);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Audio player state ni kuzatish
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsPlaying(player.playing);
+    }, 200);
+    return () => {
+      clearInterval(interval);
+      player.pause();
+    };
+  }, [player]);
+
+  const toggleAudio = () => {
+    if (player.playing) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  };
 
   const surah = getSurahById(surahId)!;
   const surahName = language === 'en' ? surah.nameEnglish : surah.nameUzbek;
@@ -119,6 +141,9 @@ export function SurahDetailScreen({ route, navigation }: SurahDetailScreenProps)
         </View>
         <TouchableOpacity onPress={handleBookmark} style={styles.headerBtn}>
           <Text style={{ fontSize: 22 }}>{isBookmarked ? '🔖' : '🏷️'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={toggleAudio} style={styles.headerBtn}>
+          <Text style={{ fontSize: 22 }}>{isPlaying ? '⏸️' : '▶️'}</Text>
         </TouchableOpacity>
       </View>
 

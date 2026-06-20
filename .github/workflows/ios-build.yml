@@ -91,48 +91,6 @@ jobs:
 
           echo "✅ Xcode configured for unsigned build"
 
-      - name: 🔧 Create EXEventEmitter.h stub for expo-av compatibility
-        run: |
-          # expo-av eski SDK da EXEventEmitter.h import qiladi,
-          # lekin SDK 56 dagi expo-modules-core da bu header yo'q.
-          # Stub yaratib xcframeworkga qo'shamiz (build uchun).
-          # NOT: echo bilan yozamiz, here-doc YAMLda muammo qiladi
-
-          STUB_FILE="/tmp/EXEventEmitter.h"
-          echo '#import <Foundation/Foundation.h>' > "$STUB_FILE"
-          echo '' >> "$STUB_FILE"
-          echo '@protocol EXEventEmitter <NSObject>' >> "$STUB_FILE"
-          echo '' >> "$STUB_FILE"
-          echo '@required' >> "$STUB_FILE"
-          echo '- (NSArray<NSString *> *)supportedEvents;' >> "$STUB_FILE"
-          echo '' >> "$STUB_FILE"
-          echo '@optional' >> "$STUB_FILE"
-          echo '- (void)startObserving;' >> "$STUB_FILE"
-          echo '- (void)stopObserving;' >> "$STUB_FILE"
-          echo '' >> "$STUB_FILE"
-          echo '@end' >> "$STUB_FILE"
-
-          echo "✅ Stub created at $STUB_FILE"
-          cat "$STUB_FILE"
-          echo ""
-
-          # ExpoModulesCore xcframework ichidagi Headers papkalariga copy qilamiz
-          echo "=== Looking for ExpoModulesCore framework Headers dirs ==="
-          find ios/Pods/ExpoModulesCore -path "*.framework/Headers" -type d 2>/dev/null | while read DIR; do
-            echo "📁 Copying stub to: $DIR"
-            cp "$STUB_FILE" "$DIR/"
-          done
-
-          # Agar framework topilmasa - diagnostic
-          HEADERS_COUNT=$(find ios/Pods/ExpoModulesCore -path "*.framework/Headers" -type d 2>/dev/null | wc -l)
-          if [ "$HEADERS_COUNT" -eq 0 ]; then
-            echo "⚠️  No ExpoModulesCore framework Headers found!"
-            echo "=== Pods/ExpoModulesCore directory ==="
-            find ios/Pods/ExpoModulesCore -type d -maxdepth 5 2>/dev/null | head -20
-          fi
-
-          echo "✅ EXEventEmitter.h stub installed"
-
       - name: 🏗️ Build .app and create IPA
         run: |
           set -o pipefail
