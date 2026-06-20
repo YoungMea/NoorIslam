@@ -73,7 +73,7 @@ jobs:
         run: |
           cd ios && EXPO_NO_PRECOMPILE=1 pod install || EXPO_NO_PRECOMPILE=1 npx pod-install
 
-      - name: 🔧 Configure Xcode for unsigned build
+      - name: 🔧 Configure Xcode for unsigned build + fix headers
         run: |
           PROJECT=$(find ios -name "project.pbxproj" -type f 2>/dev/null | head -1)
           echo "Configuring: $PROJECT"
@@ -90,6 +90,29 @@ jobs:
           sed -i '' 's/PROVISIONING_PROFILE = [^;]*;/PROVISIONING_PROFILE = "";/g' "$PROJECT"
 
           echo "✅ Xcode configured for unsigned build"
+
+      - name: 🔧 Copy ExpoModulesCore headers to prebuilt xcframework
+        run: |
+          # ExpoModulesCore prebuilt xcframeworkda ba'zi headerlar yo'q
+          # Barcha headerlarni source'dan xcframeworkga copy qilamiz
+          HEADER_SRC="node_modules/expo-modules-core/ios/ExpoModulesCore"
+          
+          if [ ! -d "$HEADER_SRC" ]; then
+            echo "❌ Header source not found at $HEADER_SRC"
+            exit 1
+          fi
+          
+          echo "Source headers available:"
+          ls "$HEADER_SRC/"*.h 2>/dev/null | wc -l | xargs echo "  .h files:"
+          
+          # Barcha .xcframework ichidagi Headers papkalariga copy qilamiz
+          find ios/Pods/ExpoModulesCore -path "*.framework/Headers" -type d 2>/dev/null | while read DIR; do
+            echo "📁 Copying headers to: $DIR"
+            cp "$HEADER_SRC/"*.h "$DIR/" 2>/dev/null
+            echo "   → $(ls "$DIR/"*.h 2>/dev/null | wc -l | xargs) headers now in framework"
+          done
+          
+          echo "✅ ExpoModulesCore headers copied to all xcframework slices"
 
       - name: 🏗️ Build .app and create IPA
         run: |
@@ -110,9 +133,6 @@ jobs:
             echo "Using project file directly"
           fi
 
-          # ExpoModulesCore prebuilt xcframeworkda ba'zi headerlar yo'q
-          EXPOMODULES_SRC="$PWD/node_modules/expo-modules-core/ios"
-
           eval xcodebuild \
             $BUILD_TARGET \
             -scheme "$SCHEME" \
@@ -124,7 +144,6 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            HEADER_SEARCH_PATHS="\$(inherited) \"$EXPOMODULES_SRC/**\"" \
             EXPO_NO_PRECOMPILE=1 \
             | tee build.log
 
