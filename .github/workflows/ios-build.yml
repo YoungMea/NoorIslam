@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -26,8 +26,15 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: 🍎 Check Xcode version
-        run: xcodebuild -version
+      - name: 🍎 Select Xcode 26 (Swift 6.2)
+        run: |
+          # Xcode 26.x ni tanlash (Swift 6.2 'apple' package uchun)
+          ls /Applications | grep -i xcode
+          sudo xcode-select -s /Applications/Xcode_26.3.app 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_26.2.app 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_26.1.1.app 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_26.0.1.app 2>/dev/null
+          xcodebuild -version
 
       - name: 📱 Generate native iOS project
         run: npx expo prebuild --platform ios --non-interactive --clean
