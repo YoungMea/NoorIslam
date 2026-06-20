@@ -96,24 +96,21 @@ jobs:
           # expo-av eski SDK da EXEventEmitter.h import qiladi,
           # lekin SDK 56 dagi expo-modules-core da bu header yo'q.
           # Stub yaratib xcframeworkga qo'shamiz (build uchun).
+          # NOT: echo bilan yozamiz, here-doc YAMLda muammo qiladi
 
           STUB_FILE="/tmp/EXEventEmitter.h"
-          cat > "$STUB_FILE" << 'OBJC'
-          // Stub for expo-av compatibility
-          // expo-av is deprecated - migrate to expo-video/expo-audio
-          #import <Foundation/Foundation.h>
-
-          @protocol EXEventEmitter <NSObject>
-
-          @required
-          - (NSArray<NSString *> *)supportedEvents;
-
-          @optional
-          - (void)startObserving;
-          - (void)stopObserving;
-
-          @end
-OBJC
+          echo '#import <Foundation/Foundation.h>' > "$STUB_FILE"
+          echo '' >> "$STUB_FILE"
+          echo '@protocol EXEventEmitter <NSObject>' >> "$STUB_FILE"
+          echo '' >> "$STUB_FILE"
+          echo '@required' >> "$STUB_FILE"
+          echo '- (NSArray<NSString *> *)supportedEvents;' >> "$STUB_FILE"
+          echo '' >> "$STUB_FILE"
+          echo '@optional' >> "$STUB_FILE"
+          echo '- (void)startObserving;' >> "$STUB_FILE"
+          echo '- (void)stopObserving;' >> "$STUB_FILE"
+          echo '' >> "$STUB_FILE"
+          echo '@end' >> "$STUB_FILE"
 
           echo "✅ Stub created at $STUB_FILE"
           cat "$STUB_FILE"
@@ -124,10 +121,9 @@ OBJC
           find ios/Pods/ExpoModulesCore -path "*.framework/Headers" -type d 2>/dev/null | while read DIR; do
             echo "📁 Copying stub to: $DIR"
             cp "$STUB_FILE" "$DIR/"
-            echo "   → Headers now: $(ls \"$DIR\" | tr '\n' ' ')"
           done
 
-          # Agar framework topilmasa - Pods ichidagi barcha ExpoModulesCore papkalarini ko'rsat
+          # Agar framework topilmasa - diagnostic
           HEADERS_COUNT=$(find ios/Pods/ExpoModulesCore -path "*.framework/Headers" -type d 2>/dev/null | wc -l)
           if [ "$HEADERS_COUNT" -eq 0 ]; then
             echo "⚠️  No ExpoModulesCore framework Headers found!"
