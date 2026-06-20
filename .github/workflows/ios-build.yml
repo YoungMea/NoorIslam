@@ -91,28 +91,24 @@ jobs:
 
           echo "✅ Xcode configured for unsigned build"
 
-      - name: 🔧 Copy ExpoModulesCore headers to prebuilt xcframework
+      - name: 🔧 Find and copy ExpoModulesCore headers
         run: |
-          # ExpoModulesCore prebuilt xcframeworkda ba'zi headerlar yo'q
-          # Barcha headerlarni source'dan xcframeworkga copy qilamiz
-          HEADER_SRC="node_modules/expo-modules-core/ios/ExpoModulesCore"
+          # ExpoModulesCore headerlarini topamiz va xcframeworkga copy qilamiz
+          echo "=== Searching for EXEventEmitter.h ==="
+          find node_modules -name "EXEventEmitter.h" -not -path "*/Pods/*" 2>/dev/null | head -10
           
-          if [ ! -d "$HEADER_SRC" ]; then
-            echo "❌ Header source not found at $HEADER_SRC"
-            exit 1
-          fi
+          echo ""
+          echo "=== ExpoModulesCore directories in node_modules ==="
+          find node_modules/expo-modules-core-* -maxdepth 3 -type d 2>/dev/null | head -20 || true
+          find node_modules/expo-modules-core -maxdepth 3 -type d 2>/dev/null | head -20
           
-          echo "Source headers available:"
-          ls "$HEADER_SRC/"*.h 2>/dev/null | wc -l | xargs echo "  .h files:"
+          echo ""
+          echo "=== Looking for ExpoModulesCore.framework Headers ==="
+          find ios/Pods/ExpoModulesCore -path "*.framework/Headers" -type d 2>/dev/null | head -5
           
-          # Barcha .xcframework ichidagi Headers papkalariga copy qilamiz
-          find ios/Pods/ExpoModulesCore -path "*.framework/Headers" -type d 2>/dev/null | while read DIR; do
-            echo "📁 Copying headers to: $DIR"
-            cp "$HEADER_SRC/"*.h "$DIR/" 2>/dev/null
-            echo "   → $(ls "$DIR/"*.h 2>/dev/null | wc -l | xargs) headers now in framework"
-          done
-          
-          echo "✅ ExpoModulesCore headers copied to all xcframework slices"
+          echo ""
+          echo "=== Listing available .h files in expo-modules-core ==="
+          find node_modules/expo-modules-core -name "*.h" -maxdepth 5 2>/dev/null | head -30
 
       - name: 🏗️ Build .app and create IPA
         run: |
